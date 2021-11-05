@@ -8,9 +8,9 @@ const app = express()
 app.get('/', async (req, res) => {
   const html = `<p>Hello world sign me!</p>`
 
-  // Need to convert these bytes to Buffer, as it currently throws an error signing (next step).
+  // Need to convert these bytes to Buffer as it currently throws an error signing (next step).
   const bytes = await _generate(html)
-  // Signing with node-signpdf
+  // Signing with node-signpdf where it is currently breaking.
   const result = await _sign(bytes)
   res.send(result)
 })
@@ -24,7 +24,10 @@ async function _generate(html) {
   const browser = await puppeteer.launch({ args: ["--no-sandbox", "--disable-setuid-sandbox", "--disable-dev-shm-usage"] });
   try {
     const page = await browser.newPage();
+    // Starting with puppeteer as this is my use case
     await page.setContent(`${html}`);
+
+    // Now using the -report library (in my real use case I need js on the footer/header)
     const pdfBytes = await report.pdfPage(page, {
       format: "a4",
       margin: {
@@ -44,6 +47,8 @@ async function _generate(html) {
 async function _sign(input) {
   try {
     const certBuffer = fs.readFileSync('./cert.p12');
+
+    // This is where it breaks
     const placeholderPdfBuffer = plainAddPlaceholder({
       pdfBuffer: input,
       reason: "This is but a test",
@@ -51,15 +56,16 @@ async function _sign(input) {
       contactInfo: "email@example.com",
     });
 
-    const signedBuffer = await signer.sign(placeholderPdfBuffer, certBuffer);
-    //////////////////////////////////////////////
-    // Do something with the signed buffer here //
-    //////////////////////////////////////////////
 
+    const signedBuffer = await signer.sign(placeholderPdfBuffer, certBuffer);
+    ///////////////////////////////////////////////////////////////////////////////
+    // Do something with the signed buffer here, if it is here it didn't errored //
+    ///////////////////////////////////////////////////////////////////////////////
+    console.log('File was signed sucessfully, yey!')
 
     return "File signed sucessfully!"
   } catch (err) {
-    console.log('Failed to sign a contract: ', err)
-    return `Failed to sign a contract: ${err}`
+    console.log('Failed to sign: ', err)
+    return `Failed to sign -- ${err}`
   }
 }
